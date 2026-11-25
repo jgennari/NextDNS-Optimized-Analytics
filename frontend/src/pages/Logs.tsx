@@ -12,8 +12,47 @@ import { DomainExclusionInput } from '@/components/DomainExclusionInput'
 import { useExcludedDomains } from '@/hooks/useExcludedDomains'
 import { useState, useMemo, useEffect, useCallback, useTransition } from 'react'
 import { useSearchParams } from 'react-router'
+import { WebQueries } from './WebQueries'
 
 export function Logs() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const grouped = searchParams.get('view') === 'web-queries'
+
+  function setGrouped(value: boolean) {
+    const params = new URLSearchParams(searchParams)
+    if (value) params.set('view', 'web-queries')
+    else params.delete('view')
+    setSearchParams(params)
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Log view">
+        <Button
+          variant={grouped ? 'outline' : 'default'}
+          aria-pressed={!grouped}
+          onClick={() => setGrouped(false)}
+        >
+          All queries
+        </Button>
+        <Button
+          variant={grouped ? 'default' : 'outline'}
+          aria-pressed={grouped}
+          onClick={() => setGrouped(true)}
+        >
+          Bare and www queries
+        </Button>
+      </div>
+      {grouped ? (
+        <WebQueries initialProfile={searchParams.get('profile') ?? undefined} />
+      ) : (
+        <LogEntries />
+      )}
+    </div>
+  )
+}
+
+function LogEntries() {
   const [searchParams] = useSearchParams()
 
   // Initialize state from URL parameters

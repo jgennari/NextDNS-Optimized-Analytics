@@ -5,8 +5,9 @@ import platform
 import secrets
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List, Optional, Dict, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import psutil
 from fastapi import FastAPI, Depends, HTTPException, Query, Header, Request, status
@@ -37,6 +38,7 @@ from auth import (
 from models import (
     init_db,
     get_logs,
+    get_web_query_groups,
     get_total_record_count,
     get_logs_stats,
     check_database_health,
@@ -824,6 +826,36 @@ async def get_stats(current_user: str = Depends(get_current_user)):
         total_records=total_records,
         message=f"Database contains {total_records:,} DNS log records",
     )
+
+
+class WebQueryGroup(BaseModel):
+    day: date
+    device_id: Optional[str]
+    device_name: Optional[str]
+    hostname: str
+    query_count: int
+
+
+class WebQueryGroupsResponse(BaseModel):
+    data: List[WebQueryGroup]
+    has_more: bool
+
+
+@app.get("/logs/web-queries", response_model=WebQueryGroupsResponse, tags=["Logs"])
+def list_web_query_groups(
+    days: int = Query(default=7, ge=1, le=30),
+    time_zone: str = Query(default="UTC", max_length=80),
+    profile: Optional[str] = Query(default=None, max_length=50),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: str = Depends(get_current_user),
+):
+    try:
+        zone = ZoneInfo(time_zone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="Invalid time zone") from exc
+    rows, has_more = get_web_query_groups(days, zone, profile, limit, offset)
+    return {"data": rows, "has_more": has_more}
 
 
 @app.get("/logs/stats", response_model=LogsStatsResponse, tags=["Logs"])

@@ -702,6 +702,48 @@ def get_logs(  # pylint: disable=too-many-positional-arguments,too-many-locals,t
 
 
 # Get total statistics for all logs in the database
+def get_web_query_groups(days, time_zone, profile, limit, offset):
+    """Group bare-domain and exact www queries by local day and DNS device."""
+    profile_filter = "AND profile_id = :profile" if profile else ""
+    query = text(
+        f"""
+        WITH recent AS (
+            SELECT
+                timezone(:zone, timestamp)::date AS day,
+                NULLIF(data->'device'->>'id', '') AS device_id,
+                NULLIF(device_name, '') AS device_name,
+                lower(rtrim(domain, '.')) AS hostname,
+                lower(rtrim(data->>'root', '.')) AS root_domain
+            FROM dns_logs
+            WHERE timestamp >= :cutoff {profile_filter}
+        )
+        SELECT day, device_id, max(device_name) AS device_name, hostname,
+               count(*) AS query_count
+        FROM recent
+        WHERE root_domain <> ''
+          AND (hostname = root_domain OR hostname = 'www.' || root_domain)
+        GROUP BY day, device_id,
+                 CASE WHEN device_id IS NULL THEN device_name END, hostname
+        ORDER BY day DESC, device_id NULLS LAST,
+                 CASE WHEN device_id IS NULL THEN recent.device_name END NULLS LAST,
+                 hostname
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    with session_factory() as session:
+        rows = session.execute(
+            query,
+            {
+                "zone": time_zone.key,
+                "cutoff": datetime.now(timezone.utc) - timedelta(days=days),
+                "profile": profile,
+                "limit": limit + 1,
+                "offset": offset,
+            },
+        ).mappings().all()
+        return [dict(row) for row in rows[:limit]], len(rows) > limit
+
+
 def get_logs_stats(profile_filter=None, time_range="all", exclude_domains=None):
     """Get statistics for DNS logs in the database, optionally filtered by profile and time range.
 
