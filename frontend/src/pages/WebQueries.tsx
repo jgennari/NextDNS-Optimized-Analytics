@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ProfileSelector } from '@/components/ProfileSelector'
+import { DeviceFilter } from '@/components/DeviceFilter'
 import { Button } from '@/components/ui/button'
 import { ErrorState, LoadingState } from '@/components/LoadingSkeletons'
 import { fetchWithAuth } from '@/lib/api'
@@ -25,10 +26,11 @@ const dayFormat = new Intl.DateTimeFormat(undefined, {
 export function WebQueries({ initialProfile }: { initialProfile?: string }) {
   const [days, setDays] = useState(7)
   const [profile, setProfile] = useState(initialProfile)
+  const [devices, setDevices] = useState<string[]>([])
   const [page, setPage] = useState(0)
 
   const { data, isPending, isFetching, isError, refetch } = useQuery({
-    queryKey: ['web-query-groups', days, profile, page, timeZone],
+    queryKey: ['web-query-groups', days, profile, page, timeZone, devices],
     queryFn: async ({ signal }): Promise<QueryPage> => {
       const params = new URLSearchParams({
         days: String(days),
@@ -37,6 +39,7 @@ export function WebQueries({ initialProfile }: { initialProfile?: string }) {
         offset: String(page * pageSize),
       })
       if (profile) params.set('profile', profile)
+      devices.forEach(device => params.append('devices', device))
       const response = await fetchWithAuth(`/api/logs/web-queries?${params}`, {
         signal,
       })
@@ -67,7 +70,9 @@ export function WebQueries({ initialProfile }: { initialProfile?: string }) {
         <ProfileSelector
           selectedProfile={profile}
           onProfileChange={value => {
+            if (value === profile) return
             setProfile(value)
+            setDevices([])
             setPage(0)
           }}
         />
@@ -94,6 +99,16 @@ export function WebQueries({ initialProfile }: { initialProfile?: string }) {
           Refresh
         </Button>
       </div>
+      <DeviceFilter
+        allowAllProfiles
+        selectedProfile={profile}
+        selectedDevices={devices}
+        timeRange={days === 1 ? '24h' : `${days}d`}
+        onDeviceSelectionChange={value => {
+          setDevices(value)
+          setPage(0)
+        }}
+      />
       {isPending && <LoadingState />}
       {isError && (
         <ErrorState

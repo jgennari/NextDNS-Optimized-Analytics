@@ -703,14 +703,16 @@ def get_logs(  # pylint: disable=too-many-positional-arguments,too-many-locals,t
 
 
 # Get total statistics for all logs in the database
-def get_web_query_groups(days, time_zone, profile, limit, offset):
+def get_web_query_groups(days, time_zone, profile, limit, offset, devices=None):
     """Group bare-domain and exact www queries by local day and DNS device."""
     profile_filter = "AND profile_id = :profile" if profile else ""
+    names = [name.strip() for name in (devices or []) if name.strip()]
+    device_filter = "AND device_name = ANY(:devices)" if names else ""
     candidates = text(
         f"""
         SELECT DISTINCT lower(rtrim(domain, '.')) AS hostname
         FROM dns_logs
-        WHERE timestamp >= :cutoff {profile_filter}
+        WHERE timestamp >= :cutoff {profile_filter} {device_filter}
         """
     )
     query = text(
@@ -722,7 +724,7 @@ def get_web_query_groups(days, time_zone, profile, limit, offset):
                 NULLIF(device_name, '') AS device_name,
                 lower(rtrim(domain, '.')) AS hostname
             FROM dns_logs
-            WHERE timestamp >= :cutoff {profile_filter}
+            WHERE timestamp >= :cutoff {profile_filter} {device_filter}
         )
         SELECT day, device_id, max(device_name) AS device_name, hostname,
                count(*) AS query_count
@@ -739,6 +741,7 @@ def get_web_query_groups(days, time_zone, profile, limit, offset):
     filters = {
         "cutoff": datetime.now(timezone.utc) - timedelta(days=days),
         "profile": profile,
+        "devices": names,
     }
     with session_factory() as session:
         hostnames = [

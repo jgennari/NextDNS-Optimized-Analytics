@@ -848,13 +848,14 @@ def list_web_query_groups(
     profile: Optional[str] = Query(default=None, max_length=50),
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    devices: Optional[List[str]] = Query(default=None),
     current_user: str = Depends(get_current_user),
 ):
     try:
         zone = ZoneInfo(time_zone)
     except (ZoneInfoNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=422, detail="Invalid time zone") from exc
-    rows, has_more = get_web_query_groups(days, zone, profile, limit, offset)
+    rows, has_more = get_web_query_groups(days, zone, profile, limit, offset, devices)
     return {"data": rows, "has_more": has_more}
 
 

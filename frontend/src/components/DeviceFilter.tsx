@@ -25,6 +25,7 @@ interface DeviceFilterProps {
   selectedDevices: string[]
   onDeviceSelectionChange: (devices: string[]) => void
   timeRange?: string
+  allowAllProfiles?: boolean
 }
 
 export const DeviceFilter = memo<DeviceFilterProps>(
@@ -33,6 +34,7 @@ export const DeviceFilter = memo<DeviceFilterProps>(
     selectedDevices,
     onDeviceSelectionChange,
     timeRange = '24h',
+    allowAllProfiles = false,
   }) => {
     const [isExpanded, setIsExpanded] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
@@ -71,8 +73,7 @@ export const DeviceFilter = memo<DeviceFilterProps>(
       onDeviceSelectionChange(selectedDevices.filter(d => d !== deviceName))
     }
 
-    // Don't show the filter if no profile is selected
-    if (!selectedProfile) {
+    if (!selectedProfile && !allowAllProfiles) {
       return (
         <Card className="opacity-50">
           <CardHeader>
@@ -140,6 +141,8 @@ export const DeviceFilter = memo<DeviceFilterProps>(
                 >
                   {device}
                   <button
+                    type="button"
+                    aria-label={`Remove ${device}`}
                     onClick={() => handleRemoveDevice(device)}
                     className="ml-1 hover:text-destructive"
                   >
@@ -212,9 +215,11 @@ export const DeviceFilter = memo<DeviceFilterProps>(
                     filteredDevices.map(device => {
                       const isSelected = selectedDevices.includes(device)
                       return (
-                        <div
+                        <button
                           key={device}
-                          className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer"
+                          type="button"
+                          aria-pressed={isSelected}
+                          className="flex w-full items-center space-x-2 p-2 text-left hover:bg-muted rounded cursor-pointer"
                           onClick={() => handleDeviceToggle(device)}
                         >
                           {isSelected ? (
@@ -223,7 +228,7 @@ export const DeviceFilter = memo<DeviceFilterProps>(
                             <Square className="h-4 w-4 text-muted-foreground" />
                           )}
                           <span className="text-sm font-medium">{device}</span>
-                        </div>
+                        </button>
                       )
                     })
                   )}
